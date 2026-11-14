@@ -1,0 +1,6 @@
+{
+  "name": "Repo2GAS",
+  "description": "ดึงเว็บไซต์และข้อมูลจาก GitHub มาสร้างโค้ด Google Apps Script (Code.gs) พร้อมพรีวิวจริงและคู่มือ Deploy เป็นเว็บไซต์",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
