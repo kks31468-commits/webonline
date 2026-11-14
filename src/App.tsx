@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  Check,
   Code2,
   Download,
   ExternalLink,
@@ -8,6 +9,7 @@ import {
   Globe,
   KeyRound,
   RefreshCw,
+  Share2,
 } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { DeploymentGuide } from './components/DeploymentGuide';
@@ -102,6 +104,7 @@ export default function App() {
   // Workspace UI State
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('preview');
   const [activeCodeFile, setActiveCodeFile] = useState<CodeFileTab>('code.gs');
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Preview State
   const [previewBundle, setPreviewBundle] = useState<PreviewBundleResult | null>(null);
@@ -443,9 +446,16 @@ export default function App() {
     [tokenInput, basePathInput, dataFile, renderMode, runPreviewForCurrentMode]
   );
 
-  // Initial load on first mount
+  // Initial load on first mount (supports ?repo=... shareable online URL)
   useEffect(() => {
-    void loadRepositoryManual('mdn/beginner-html-site-styled', '');
+    const params = new URLSearchParams(window.location.search);
+    const sharedRepo = params.get('repo');
+    if (sharedRepo && sharedRepo.trim()) {
+      setRepoInput(sharedRepo.trim());
+      void runAiMagicSetup(sharedRepo.trim(), params.get('prompt') || '');
+    } else {
+      void loadRepositoryManual('mdn/beginner-html-site-styled', '');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -531,6 +541,30 @@ export default function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleCopyShareUrl = async () => {
+    const targetRepo = repoMeta?.fullName || repoInput.trim();
+    const url = new URL(window.location.href);
+    url.search = '';
+    if (targetRepo) {
+      url.searchParams.set('repo', targetRepo);
+    }
+    const shareStr = url.toString();
+    try {
+      await navigator.clipboard.writeText(shareStr);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = shareStr;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setLinkCopied(true);
+    window.setTimeout(() => setLinkCopied(false), 1800);
   };
 
   const handleEntrySelectFromPreviewOrExplorer = (fullPath: string) => {
@@ -999,15 +1033,34 @@ export default function App() {
               </div>
 
               {repoMeta && (
-                <a
-                  href={repoMeta.htmlUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap shrink-0"
-                >
-                  เปิดบน GitHub
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                <div className="flex items-center gap-4 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleCopyShareUrl}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    {linkCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        คัดลอกลิงก์แชร์แล้ว
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-3.5 h-3.5" />
+                        แชร์ลิงก์โปรเจกต์
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href={repoMeta.htmlUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap shrink-0"
+                  >
+                    เปิดบน GitHub
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
               )}
             </div>
 

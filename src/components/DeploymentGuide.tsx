@@ -104,6 +104,38 @@ export function DeploymentGuide({ hasIndexHtml, usePrivateToken }: DeploymentGui
           </div>
         </div>
       </div>
+
+      {/* Hosting This App Online */}
+      <div className="bg-white border border-slate-200 rounded-xl p-6">
+        <h3 className="text-base font-semibold text-slate-900">
+          วิธีเปิดให้ตัวแอป Repo2GAS นี้ออนไลน์สำหรับใช้งานและแชร์ต่อ
+        </h3>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-slate-600 leading-relaxed">
+          <div>
+            <div className="font-medium text-slate-900">
+              วิธีที่ 1: เปิดออนไลน์ทันทีผ่าน Cloud Run / ลิงก์แชร์
+            </div>
+            <p className="mt-1">
+              ตัวแอปถูกออกแบบเป็น Full-Stack Node.js + Vite พร้อมระบบ AI บนเซิร์ฟเวอร์เรียบร้อยแล้ว
+              สามารถกดปุ่ม Share / Publish ของโปรเจกต์เพื่อสร้างลิงก์ออนไลน์สาธารณะได้ทันที
+              และส่งลิงก์แบบ <code className="text-slate-900">?repo=owner/repo</code>{' '}
+              ให้ผู้อื่นเปิดเข้ามาให้ AI วิเคราะห์ให้อัตโนมัติได้เลย
+            </p>
+          </div>
+          <div>
+            <div className="font-medium text-slate-900">
+              วิธีที่ 2: นำไปโฮสต์บนเซิร์ฟเวอร์ของคุณเอง
+            </div>
+            <p className="mt-1">
+              ดาวน์โหลดโค้ดโปรเจกต์นี้ไปรันบน Cloud Run, Render หรือ Railway ได้ทันที โดยสั่ง{' '}
+              <code className="text-slate-900">npm run build</code> แล้วสตาร์ทด้วย{' '}
+              <code className="text-slate-900">npm start</code> (รัน{' '}
+              <code className="text-slate-900">node server.ts</code>) พร้อมตั้งค่าตัวแปร{' '}
+              <code className="text-slate-900">GEMINI_API_KEY</code> บนเซิร์ฟเวอร์
+            </p>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
