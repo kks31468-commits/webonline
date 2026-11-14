@@ -25,6 +25,7 @@ import {
   RepoMeta,
 } from './types/github';
 import { generateGasProject } from './utils/gasGenerator';
+import { runClientSmartAutoSetup } from './utils/clientAutoSetup';
 import {
   buildDataBridgePreviewHtml,
   buildLivePreviewHtml,
@@ -275,27 +276,53 @@ export default function App() {
       setRefineMessage(null);
 
       try {
-        const res = await fetch('/api/ai/magic-setup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            repoUrl: trimmedUrl,
-            instruction: (userPrompt ?? aiInstruction).trim(),
-            githubToken: tokenInput.trim() || undefined,
-          }),
-        });
-
-        const payload = await res.json();
-        if (!res.ok) {
-          throw new Error(payload.error || 'AI ไม่สามารถวิเคราะห์ Repository นี้ได้');
-        }
-
-        const { meta, branch, files: fetchedFiles, aiResult } = payload as {
+        let resultData: {
           meta: RepoMeta;
           branch: string;
           files: RepoFileItem[];
           aiResult: AiMagicSetupResult;
         };
+
+        // Use relative path without leading slash so it respects any subpath, and fall back to
+        // client-side auto-setup when hosted statically on GitHub Pages (404/405/HTML response).
+        let useClientFallback = false;
+        try {
+          const res = await fetch('/api/ai/magic-setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              repoUrl: trimmedUrl,
+              instruction: (userPrompt ?? aiInstruction).trim(),
+              githubToken: tokenInput.trim() || undefined,
+            }),
+          });
+
+          const contentType = res.headers.get('content-type') || '';
+          if (res.status === 404 || res.status === 405 || !contentType.includes('application/json')) {
+            useClientFallback = true;
+          } else {
+            const payload = await res.json();
+            if (!res.ok) {
+              throw new Error(payload.error || 'AI ไม่สามารถวิเคราะห์ Repository นี้ได้');
+            }
+            resultData = payload;
+          }
+        } catch (fetchErr) {
+          if (fetchErr instanceof TypeError) {
+            useClientFallback = true;
+          } else {
+            throw fetchErr;
+          }
+        }
+
+        if (useClientFallback) {
+          resultData = await runClientSmartAutoSetup(
+            trimmedUrl,
+            tokenInput.trim() || undefined
+          );
+        }
+
+        const { meta, branch, files: fetchedFiles, aiResult } = resultData!;
 
         setRepoMeta(meta);
         setActiveBranch(branch);
@@ -505,6 +532,13 @@ export default function App() {
         }),
       });
 
+      const contentType = res.headers.get('content-type') || '';
+      if (res.status === 404 || res.status === 405 || !contentType.includes('application/json')) {
+        throw new Error(
+          'ฟีเจอร์สั่ง AI แก้โค้ด HTML แบบโต้ตอบต้องรันบนโหมดเซิร์ฟเวอร์ (Node.js / Cloud Run) หากใช้งานบน GitHub Pages สามารถนำโค้ด Index.html ที่สร้างไว้ไปแก้ไขได้โดยตรงครับ'
+        );
+      }
+
       const payload = await res.json();
       if (!res.ok) {
         throw new Error(payload.error || 'ไม่สามารถปรับแต่งหน้าเว็บได้');
@@ -592,7 +626,7 @@ export default function App() {
   const activeFullEntryPath = joinRepoPath(basePathInput, entryFile);
 
   return (
-    <div id="top" className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+    <div id="top" className="min-h-screen bg-slate-50 text-slate-900 flex flex-col overflow-x-hidden">
       {/* Top Bar Contract: 3 zones separated by gap-8 */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-[1380px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-8">
@@ -617,10 +651,10 @@ export default function App() {
               วิธีติดตั้งบน Google
             </a>
             <a
-              href="#faq"
+              href="#github-pages"
               className="hover:text-slate-900 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
             >
-              การแก้ปัญหา
+              อัปขึ้น GitHub
             </a>
           </nav>
 
@@ -628,7 +662,7 @@ export default function App() {
             <button
               type="button"
               onClick={handleDownloadPrimaryCode}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 min-h-[40px]"
             >
               <Download className="w-4 h-4" />
               ดาวน์โหลด Code.gs
@@ -663,7 +697,7 @@ export default function App() {
                   value={repoInput}
                   onChange={(e) => setRepoInput(e.target.value)}
                   placeholder="วางลิงก์ GitHub เช่น https://github.com/username/my-project"
-                  className="w-full px-4 py-3 text-sm font-mono bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 text-base lg:text-sm font-mono bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[46px]"
                 />
               </div>
 
@@ -677,14 +711,14 @@ export default function App() {
                   value={aiInstruction}
                   onChange={(e) => setAiInstruction(e.target.value)}
                   placeholder="คำสั่งเสริม (ไม่บังคับ) เช่น ทำเป็นเว็บค้นหาข้อมูล"
-                  className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 text-base lg:text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[46px]"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={aiLoading}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 min-h-[46px]"
               >
                 {aiLoading ? (
                   <>

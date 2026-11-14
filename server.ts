@@ -443,6 +443,52 @@ ${(currentHtml || '').slice(0, 12000)}
   }
 });
 
+app.get('/api/export/github-pages-html', async (_req: Request, res: Response) => {
+  try {
+    const distPath = path.resolve(__dirname, 'dist');
+    const indexPath = path.join(distPath, 'index.html');
+
+    if (!fs.existsSync(indexPath)) {
+      const { build } = await import('vite');
+      await build();
+    }
+
+    let html = fs.readFileSync(indexPath, 'utf-8');
+
+    // Inline stylesheet links referencing ./assets/... or /assets/...
+    html = html.replace(
+      /<link\b[^>]*rel=["']stylesheet["'][^>]*href=["'](?:\.?\/)?(assets\/[^"']+)["'][^>]*>/gi,
+      (full, relAssetPath: string) => {
+        const assetFile = path.join(distPath, relAssetPath);
+        if (!fs.existsSync(assetFile)) return full;
+        const css = fs.readFileSync(assetFile, 'utf-8');
+        return `<style>\n${css}\n</style>`;
+      }
+    );
+
+    // Inline module script tags referencing ./assets/... or /assets/... via UTF-8 safe Blob loader
+    html = html.replace(
+      /<script\b[^>]*src=["'](?:\.?\/)?(assets\/[^"']+)["'][^>]*><\/script>/gi,
+      (full, relAssetPath: string) => {
+        const assetFile = path.join(distPath, relAssetPath);
+        if (!fs.existsSync(assetFile)) return full;
+        const jsBuffer = fs.readFileSync(assetFile);
+        const b64 = jsBuffer.toString('base64');
+        return `<script type="module">\nconst _b = Uint8Array.from(atob("${b64}"), c => c.charCodeAt(0));\nimport(URL.createObjectURL(new Blob([_b], { type: "text/javascript;charset=utf-8" })));\n</script>`;
+      }
+    );
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="index.html"');
+    res.send(html);
+  } catch (err) {
+    console.error('Export standalone HTML error:', err);
+    res.status(500).json({
+      error: 'ไม่สามารถสร้างไฟล์ index.html แบบไฟล์เดียวได้',
+    });
+  }
+});
+
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ ok: true, service: 'Repo2GAS' });
 });
