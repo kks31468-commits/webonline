@@ -393,14 +393,14 @@ export default function App() {
         setRepoMeta(meta);
         setActiveBranch(branch);
         setBranchInput(branch);
-        if (parsed.subPath && !basePathInput) {
-          setBasePathInput(parsed.subPath);
-        }
+        const nextBasePath =
+          parsed.subPath || (meta.fullName === repoMeta?.fullName ? basePathInput : '');
+        setBasePathInput(nextBasePath);
         setFiles(fetchedFiles);
         setUsePrivateToken(meta.isPrivate || Boolean(tokenInput.trim()));
         setPageTitle(meta.repo);
 
-        const subPrefix = (parsed.subPath || basePathInput).replace(/^\/+|\/+$/g, '');
+        const subPrefix = nextBasePath.replace(/^\/+|\/+$/g, '');
         const scopedHtml = fetchedFiles.filter(
           (f) => f.category === 'html' && (!subPrefix || f.path.startsWith(subPrefix + '/'))
         );
@@ -928,8 +928,16 @@ export default function App() {
                   {dataFiles.length > 0 ? (
                     <select
                       id="data-file"
-                      value={dataFile}
-                      onChange={(e) => setDataFile(e.target.value)}
+                      value={joinRepoPath(basePathInput, dataFile)}
+                      onChange={(e) => {
+                        const full = e.target.value;
+                        const cleanBase = basePathInput.trim().replace(/^\/+|\/+$/g, '');
+                        const rel =
+                          cleanBase && full.startsWith(cleanBase + '/')
+                            ? full.slice(cleanBase.length + 1)
+                            : full;
+                        setDataFile(rel);
+                      }}
                       className="w-full px-3 py-2 text-xs font-mono bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       {dataFiles.map((f) => (
