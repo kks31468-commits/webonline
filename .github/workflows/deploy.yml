@@ -26,8 +26,18 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Install dependencies
-        run: npm install --legacy-peer-deps --no-audit --no-fund
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --legacy-peer-deps --no-audit --no-fund
+          else
+            npm install --legacy-peer-deps --no-audit --no-fund
+          fi
 
       - name: Build static site
         run: npm run build
@@ -35,12 +45,7 @@ jobs:
       - name: Add SPA 404 fallback
         run: cp dist/index.html dist/404.html
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: Upload Pages artifact
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
